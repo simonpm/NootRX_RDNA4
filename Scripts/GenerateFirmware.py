@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-# Copyright © 2022-2024 ChefKiss. Licensed under the Thou Shalt Not Profit License version 1.5.
+# Copyright © 2022-2024 ChefKiss.
+# Licensed under the Thou Shalt Not Profit License version 1.5.
 # See LICENSE for details.
 
 import os
@@ -38,9 +39,10 @@ def byte_to_char(b, is_text: bool):
         if 0 <= b <= 127 and chr(b).isalnum():
             return chr(b)
         else:
-            assert False
+            # Log and safely escape unknown bytes
+            return f"\\x{b:02X}"
     else:
-        return f"\\x{b:X}"
+        return f"\\x{b:02X}"
 
 
 def bytes_to_cstr(data, is_text=False):
@@ -59,14 +61,21 @@ def process_files(target_file, dir):
     os.makedirs(os.path.dirname(target_file), exist_ok=True)
     lines = header.splitlines(keepends=True) + ["\n"]
     file_list_content = []
+
+    # Collect and filter files
     files = filter(
         lambda v: not is_file_excluded(os.path.basename(v[1])),
         [(root, file) for root, _, files in os.walk(dir) for file in files],
     )
+
     for root, file in files:
-        with open(os.path.join(root, file), "rb") as src_file:
+        full_path = os.path.join(root, file)
+        print(f"Processing: {full_path}")
+
+        with open(full_path, "rb") as src_file:
             src_data = src_file.read()
             src_len = len(src_data)
+
         is_text = is_file_text(os.path.basename(file))
         var_ident = file.replace(".", "_").replace("-", "_")
         var_contents = bytes_to_cstr(src_data, is_text)
@@ -80,7 +89,11 @@ def process_files(target_file, dir):
 
     with open(target_file, "w") as file:
         file.writelines(lines)
+        print(f"✅ Output written to: {target_file}")
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: GenerateFirmware.py <output_file> <input_dir>")
+        sys.exit(1)
     process_files(sys.argv[1], sys.argv[2])
